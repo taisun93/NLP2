@@ -80,10 +80,10 @@ class FFNN(nn.Module):
     
     def back(self, output, target):
         loss = nn.NLLLoss()
-        print("output",output)
-        print("target",target)
+        # print("output",output)
+        # print("target",target)
         x = loss(output, target)
-        print("loss",x)
+        # print("loss",x)
         x.backward()
         self.optimizer.step()
 
