@@ -141,15 +141,17 @@ def train_deep_averaging_network(args, train_exs: List[SentimentExample], dev_ex
     # zoop = train_exs[0].words[0]
     # word_embeddings.get_embedding(zoop)
     # torch.from_numpy(train_exs[0]).float()
-    for ex in train_exs[:20]:
-        prob = classifier.getprob(ex.words)
-        right: Any
-        if ex.label == 0:
-            right = torch.tensor([1, 0])
-        else:
-            right = torch.tensor([0, 1])
+    for epoch in range(5):
+        random.shuffle(train_exs)
+        for ex in train_exs:
+            prob = classifier.getprob(ex.words)
+            right: Any
+            if ex.label == 0:
+                right = torch.tensor([1, 0])
+            else:
+                right = torch.tensor([0, 1])
 
-        classifier.correct(prob,right)
+            classifier.correct(prob,right)
         
     # for ex in train_exs[:2]:
     #     prob = classifier.getprob(ex.words)
