@@ -1,5 +1,6 @@
 # models.py
 
+from tkinter import X
 from typing import Any
 import torch
 import torch.nn as nn
@@ -77,8 +78,13 @@ class FFNN(nn.Module):
         b = torch.from_numpy(x).float()
         return self.log_softmax(self.W(self.g(self.V(b))))
     
-    def back(self, loss):
-        loss.backward()
+    def back(self, output, target):
+        loss = nn.NLLLoss()
+        print("output",output)
+        print("target",target)
+        x = loss(output, target)
+        print("loss",x)
+        x.backward()
         self.optimizer.step()
 
 
@@ -90,15 +96,15 @@ class NeuralSentimentClassifier(SentimentClassifier):
 
     def __init__(self, embed: WordEmbeddings):
         self.embed = embed
-        self.NN = FFNN(50, 50, 2, embed)
+        self.NN = FFNN(embed.get_embedding_length(), 50, 2, embed)
 
     def getprob(self, ex_words: List[str]) -> any:
         result = self.NN.forward(ex_words)
         return result
 
-    def correct(self, result, correct):
-        loss = torch.neg(result).dot(correct)
-        self.NN.back(loss)
+    def correct(self, result, target):
+        # loss = torch.neg(result).dot(correct)
+        self.NN.back(result, target)
         # return
 
 
@@ -135,13 +141,13 @@ def train_deep_averaging_network(args, train_exs: List[SentimentExample], dev_ex
     # zoop = train_exs[0].words[0]
     # word_embeddings.get_embedding(zoop)
     # torch.from_numpy(train_exs[0]).float()
-    for ex in train_exs:
+    for ex in train_exs[:20]:
         prob = classifier.getprob(ex.words)
         right: Any
-        if ex.label == 1:
-            right = torch.tensor([1.0, 0.0])
+        if ex.label == 0:
+            right = torch.tensor([1, 0])
         else:
-            right = torch.tensor([0.0, 1.0])
+            right = torch.tensor([0, 1])
 
         classifier.correct(prob,right)
         
