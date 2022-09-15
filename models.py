@@ -1,5 +1,6 @@
 # models.py
 
+from typing import Any
 import torch
 import torch.nn as nn
 from torch import optim
@@ -40,10 +41,14 @@ class TrivialSentimentClassifier(SentimentClassifier):
         """
         return 1
 
+
 class FFNN(nn.Module):
-    def __init__(self, inp, hid, out, embed:WordEmbeddings):
+    def __init__(self, inp, hid, out, embed: WordEmbeddings):
         super(FFNN, self).__init__()
-        self.V = embed.get_initialized_embedding_layer()
+        self.embed = embed
+        
+
+        self.V = nn.Linear(inp, hid)
         # self.g = nn.Tanh()
         self.g = nn.ReLU()
         self.W = nn.Linear(hid, out)
@@ -51,8 +56,9 @@ class FFNN(nn.Module):
         # Initialize weights according to a formula due to Xavier Glorot.
         nn.init.xavier_uniform_(self.V.weight)
         nn.init.xavier_uniform_(self.W.weight)
-    
-    def forward(self, x):
+        self.optimizer = optim.Adam(self.parameters(), lr=0.1)
+
+    def forward(self, sentence):
         """
         Runs the neural network on the given data and returns log probabilities of the various classes.
 
@@ -60,7 +66,21 @@ class FFNN(nn.Module):
         :return: an [out]-sized tensor of log probabilities. (In general your network can be set up to return either log
         probabilities or a tuple of (loss, log probability) if you want to pass in y to this function as well
         """
-        return self.log_softmax(self.W(self.g(self.V(x))))
+
+        self.zero_grad()
+        x = self.embed.get_embedding(sentence[0])
+
+        for word in sentence[1:]:
+            x += self.embed.get_embedding(word)
+
+        x /= len(sentence)
+        b = torch.from_numpy(x).float()
+        return self.log_softmax(self.W(self.g(self.V(b))))
+    
+    def back(self, loss):
+        loss.backward()
+        self.optimizer.step()
+
 
 class NeuralSentimentClassifier(SentimentClassifier):
     """
@@ -70,8 +90,16 @@ class NeuralSentimentClassifier(SentimentClassifier):
 
     def __init__(self, embed: WordEmbeddings):
         self.embed = embed
-        self.NN = FFNN(50,50,2, embed)
+        self.NN = FFNN(50, 50, 2, embed)
 
+    def getprob(self, ex_words: List[str]) -> any:
+        result = self.NN.forward(ex_words)
+        return result
+
+    def correct(self, result, correct):
+        loss = torch.neg(result).dot(correct)
+        self.NN.back(loss)
+        # return
 
 
 
@@ -82,12 +110,16 @@ class NeuralSentimentClassifier(SentimentClassifier):
         :return: 0 or 1 with the label
         """
         # print(len(ex_words))
-        for word in ex_words:
-            # embed = self.embed.get_embedding(word)
-            print(self.NN.forward(word))
-        
-        return 0
-       
+        answer = self.getprob(ex_words).detach().numpy()
+        # print(answer[0])
+        # # print(answer[])
+        # print(answer)
+        if answer[0]>answer[1]:
+            return 0
+        # print("sdfljksdfjkldsfjlk")
+        return 1
+
+
 def train_deep_averaging_network(args, train_exs: List[SentimentExample], dev_exs: List[SentimentExample], word_embeddings: WordEmbeddings) -> NeuralSentimentClassifier:
     """
     :param args: Command-line args so you can access them here
@@ -103,6 +135,26 @@ def train_deep_averaging_network(args, train_exs: List[SentimentExample], dev_ex
     # zoop = train_exs[0].words[0]
     # word_embeddings.get_embedding(zoop)
     # torch.from_numpy(train_exs[0]).float()
-    classifier.predict(train_exs[0].words)
-    return classifier
+    for ex in train_exs:
+        prob = classifier.getprob(ex.words)
+        right: Any
+        if ex.label == 1:
+            right = torch.tensor([1.0, 0.0])
+        else:
+            right = torch.tensor([0.0, 1.0])
 
+        classifier.correct(prob,right)
+        
+    # for ex in train_exs[:2]:
+    #     prob = classifier.getprob(ex.words)
+    #     correct: Any
+    #     if ex.label == 0:
+    #         correct = torch.tensor([1.0, 0.0])
+    #     else:
+    #         correct = torch.tensor([0.0, 1.0])
+
+    #     classifier.correct(prob,correct)
+    #     print(prob)
+    classifier.predict(train_exs[0].words)
+
+    return classifier
