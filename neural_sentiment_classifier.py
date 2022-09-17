@@ -113,6 +113,7 @@ if __name__ == '__main__':
     train_eval_time = time.time() - start_time
     print("Time for training and evaluation: %.2f seconds" % train_eval_time)
 
+    # Write the test set output
     if args.run_on_test:
         test_exs_predicted = [SentimentExample(words, model.predict(words)) for words in test_exs]
         write_sentiment_examples(test_exs_predicted, args.test_output_path)
