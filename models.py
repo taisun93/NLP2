@@ -83,21 +83,16 @@ class FFNN(nn.Module):
                 input.append(0)
             else:
                 input.append(index)
-            # input += 
-        # print(len(input))
+
         z = self.embedLayer(torch.LongTensor(input))
-        # print(z.size())
+
         z = torch.mean(z, 0)
-        # if(printThis): print(z)
         z = self.V(z)
         z = self.g(z)
         z = self.W(z)
-        # if(printThis): print("after hidden layer",z)
-        # z = self.g1(z)
-        # z = self.W1(z)
         z = self.g2(z)
         z = self.W2(z)
-        if(printThis): print("before softmax",z)
+        # if(printThis): print("before softmax",z)
         return self.log_softmax(z)
     
     # def back(self, output, target):
@@ -118,7 +113,7 @@ class NeuralSentimentClassifier(SentimentClassifier):
 
     def __init__(self, embed: WordEmbeddings):
         self.embed = embed
-        self.NN = FFNN(embed.get_embedding_length(), 50, 1, embed)
+        self.NN = FFNN(embed.get_embedding_length(), 50, 2, embed)
 
     def getprob(self, ex_words: List[str]) -> any:
         result = self.NN.forward(ex_words)
@@ -132,11 +127,10 @@ class NeuralSentimentClassifier(SentimentClassifier):
         """
         # print(len(ex_words))
         answer = self.NN.forward(ex_words, True)
-        # print(answer[0])
-        
-        # if answer[0]>answer[1]:
-        #     return 0
-        # return 1
+        # print(answer[0])     
+        if answer[0]>answer[1]:
+            return 0
+        return 1
 
 
 def train_deep_averaging_network(args, train_exs: List[SentimentExample], dev_exs: List[SentimentExample], word_embeddings: WordEmbeddings) -> NeuralSentimentClassifier:
@@ -147,41 +141,37 @@ def train_deep_averaging_network(args, train_exs: List[SentimentExample], dev_ex
     :param word_embeddings: set of loaded word embeddings
     :return: A trained NeuralSentimentClassifier model
     """
-    lossFunction = nn.NLLLoss()
+    lossFunction = nn.CrossEntropyLoss()
     classifier = NeuralSentimentClassifier(word_embeddings)
-    optimizer = optim.Adam(classifier.NN.parameters(), lr=.1)
-    random.shuffle(train_exs)
-    train_exs = train_exs[:1000]
-    print(classifier.NN.parameters())
-    for epoch in range(3):
+    optimizer = optim.Adam(classifier.NN.parameters(), lr=.01)
+    # random.shuffle(train_exs)
+    # train_exs = train_exs[:1000]
+    # print(classifier.NN.parameters())
+    for epoch in range(15):
         totalLoss = 0
         random.shuffle(train_exs)
         for ex in train_exs:
             words, target = ex.words, ex.label
             prob = classifier.getprob(words)
             
-            # correct: Any
-            # if ex.label == 0:
-            #     # print(0)
-            #     correct = torch.tensor([1, 0])
-            # else:
-            #     # print(1)
-            #     correct = torch.tensor([0, 1])
+            correct: Any
+            if ex.label == 0:
+                # print(0)
+                correct = torch.tensor([1.0, 0.0])
+            else:
+                # print(1)
+                correct = torch.tensor([0.0, 1.0])
             # # print(prob)
-            x = torch.LongTensor(target)
+            # x = torch.tensor([target])
             # print(x.size())
             # print(prob.size())
 
-            loss = lossFunction(prob,x)
+            loss = lossFunction(prob,correct)
             # print(loss)
             totalLoss+=loss
             classifier.NN.zero_grad()
             loss.backward()
             optimizer.step()
         print(f"loss in {epoch} is {totalLoss}")
-        print(classifier.predict(train_exs[0].words))
-        print(classifier.predict(train_exs[1].words))
-    #     print(prob)
-    # print(classifier.predict(train_exs[0].words))
 
     return classifier
